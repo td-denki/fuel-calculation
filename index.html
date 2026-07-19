@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>給油ログ — 匡電気管理事務所</title>
+<style>
+/* ====== リセット・ベース ====== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:     #EDF0EB;
+  --panel:  #FFFFFF;
+  --ink:    #17242E;
+  --sub:    #5C6B76;
+  --line:   #D8DEDA;
+  --red:    #C8402E;
+  --yellow: #D9A400;
+  --green:  #1E7A4F;
+  --drum:   #101820;
+}
+body {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  min-height: 100vh;
+}
+input, select, button, textarea {
+  font-family: inherit;
+  font-size: 15px;
+}
+input, select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+}
+input:focus, select:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+button { cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ====== ユーティリティ ====== */
+.hidden   { display: none !important; }
+.flex     { display: flex; }
+.col      { flex-direction: column; }
+.gap4     { gap: 4px; }
+.gap8     { gap: 8px; }
+.gap12    { gap: 12px; }
+.gap16    { gap: 16px; }
+.wrap     { flex-wrap: wrap; }
+.between  { justify-content: space-between; }
+.center   { align-items: center; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.btn {
+  border: none; border-radius: 6px; padding: 9px 18px;
+  font-weight: 700; white-space: nowrap;
+}
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-danger  { background: none; color: var(--red); border: none; font-size: 13px; }
+.btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--ink); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.lbl { font-size: 12px; color: var(--sub); font-weight: 600; margin-bottom: 4px; }
+.badge {
+  font-size: 11px; border-radius: 4px; padding: 2px 6px;
+  font-weight: 700; margin-left: 6px;
+}
+.badge-green { background: #EAF3EE; color: var(--green); }
+.badge-yellow{ background: #FFF8E0; color: #A07800; }
+.tag-mono {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px; color: var(--sub);
+  background: #F2F4F2; border-radius: 4px;
+  padding: 1px 7px; margin-left: 8px;
+}
+.text-sub  { color: var(--sub); }
+.text-sm   { font-size: 13px; }
+.text-xs   { font-size: 12px; }
+.text-red  { color: var(--red); }
+.text-green{ color: var(--green); }
+.fw7       { font-weight: 700; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media(max-width:480px){ .grid2 { grid-template-columns: 1fr; } }
+
+/* ====== ログイン画面 ====== */
+#loginScreen {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.login-box {
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 36px 32px;
+  width: 100%; max-width: 380px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+.login-logo .dot { width:12px; height:12px; border-radius:50%; background:var(--red); }
+.login-logo h1  { font-size: 20px; font-weight: 800; letter-spacing: 0.03em; }
+
+/* ====== アプリ本体 ====== */
+#appScreen { min-height: 100vh; }
+header {
+  background: var(--ink); color: #fff;
+  padding: 13px 16px; position: sticky; top: 0; z-index: 50;
+}
+.header-inner {
+  max-width: 800px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.header-logo { display: flex; align-items: center; gap: 8px; }
+.header-logo .dot{ width:9px; height:9px; border-radius:50%; background:var(--red); }
+
+nav {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 48px; z-index: 40;
+}
+.nav-inner {
+  max-width: 800px; margin: 0 auto;
+  display: flex;
+}
+.tab-btn {
+  flex: 1; padding: 12px 6px; border: none;
+  background: transparent; font-size: 14px; font-weight: 600;
+  color: var(--sub); border-bottom: 3px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn.active { color: var(--ink); border-bottom-color: var(--red); }
+
+main {
+  max-width: 800px; margin: 0 auto;
+  padding: 16px 14px 72px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ====== オドメーター ====== */
+.odo-wrap { display: flex; flex-direction: column; gap: 6px; }
+.odo-label{ font-size: 11px; letter-spacing:.12em; color:var(--sub); font-weight:600; }
+.odo-row  { display: flex; align-items: baseline; gap: 6px; }
+.odo-digits { display: flex; gap: 2px; }
+.odo-digit {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600; line-height: 1;
+  color: #F3F5F2;
+  background: linear-gradient(180deg,#2A3540 0%,#101820 30%,#101820 70%,#060A0E 100%);
+  border-radius: 4px; text-align: center;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.25);
+}
+.odo-dot { color: var(--sub); font-weight: 600; font-family: monospace; }
+.odo-unit{ font-size: 13px; color: var(--sub); font-weight: 600; }
+
+/* ====== 記録カード ====== */
+.rec-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.rec-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; font-size: 14px; }
+.rec-meta .key{ color: var(--sub); font-size: 11px; margin-right: 4px; }
+.fuel-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* ====== グラフ ====== */
+.chart-wrap { position:relative; width:100%; }
+svg text { font-size: 11px !important; }
+
+/* ====== スピナー ====== */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ====== スナックバー ====== */
+#snack {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff;
+  padding: 10px 22px; border-radius: 8px;
+  font-size: 14px; font-weight: 600; z-index: 200;
+  opacity: 0; transition: opacity .25s; pointer-events: none;
+}
+#snack.show { opacity: 1; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ======================================================
+     ログイン画面
+====================================================== -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <span class="dot"></span>
+      <h1>給油ログ</h1>
+    </div>
+    <p class="text-sub text-sm" style="margin-bottom:24px">匡電気管理事務所 — 燃費・走行距離管理</p>
+    <div class="flex col gap8" style="margin-bottom:16px">
+      <div>
+        <div class="lbl">氏名</div>
+        <input type="text" id="loginName" placeholder="例: 佐藤英匡" autocomplete="username">
+      </div>
+      <div>
+        <div class="lbl">パスワード</div>
+        <input type="password" id="loginPass" autocomplete="current-password">
+      </div>
+    </div>
+    <div id="loginErr" class="text-red text-sm hidden" style="margin-bottom:10px"></div>
+    <button class="btn btn-primary" style="width:100%" id="loginBtn" onclick="doLogin()">ログイン</button>
+  </div>
+</div>
+
+<!-- ======================================================
+     アプリ本体
+====================================================== -->
+<div id="appScreen" class="hidden">
+  <header>
+    <div class="header-inner">
+      <div class="header-logo">
+        <span class="dot"></span>
+        <span style="font-weight:700;font-size:17px;letter-spacing:.04em">給油ログ</span>
+      </div>
+      <div class="flex center gap8 wrap">
+        <select id="vehicleSelect" style="width:auto;background:#243240;color:#fff;border-color:#3A4A58" onchange="onVehicleChange()"></select>
+        <span id="headerUser" class="text-xs" style="opacity:.7"></span>
+        <button class="btn" style="background:#2D3E4A;color:#fff;padding:6px 12px;font-size:13px" onclick="doLogout()">ログアウト</button>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <div class="nav-inner">
+      <button class="tab-btn active" data-tab="log"     onclick="switchTab('log')">給油記録</button>
+      <button class="tab-btn"        data-tab="stats"   onclick="switchTab('stats')">統計</button>
+      <button class="tab-btn"        data-tab="export"  onclick="switchTab('export')">CSV出力</button>
+      <button class="tab-btn"        data-tab="vehicle" onclick="switchTab('vehicle')">車両管理</button>
+    </div>
+  </nav>
+
+  <main>
+    <!-- === 給油記録タブ === -->
+    <div id="tab-log">
+      <!-- サマリー -->
+      <div class="panel flex gap16 wrap" id="summary"></div>
+      <!-- 入力フォーム -->
+      <div class="panel" id="formPanel">
+        <div class="flex between center" style="margin-bottom:12px">
+          <strong id="formTitle">給油を記録</strong>
+          <button class="hidden text-sub text-sm btn" style="background:none;border:none" id="cancelEditBtn" onclick="cancelEdit()">キャンセル</button>
+        </div>
+        <div class="grid2">
+          <div><div class="lbl">給油日</div><input type="date" id="fDate"></div>
+          <div><div class="lbl">走行距離計 ODO (km)</div><input type="number" id="fOdo" placeholder="例: 45230" inputmode="decimal"></div>
+          <div><div class="lbl">給油量 (L)</div><input type="number" id="fLiters" step="0.01" placeholder="例: 42.5" inputmode="decimal"></div>
+          <div><div class="lbl">単価 (円/L)</div><input type="number" id="fPrice" step="0.1" placeholder="例: 172" inputmode="decimal"></div>
+          <div><div class="lbl">支払額 (円)</div><input type="number" id="fTotal" placeholder="自動計算" inputmode="numeric"></div>
+          <div>
+            <div class="lbl">油種</div>
+            <select id="fFuelType">
+              <option value="regular">レギュラー</option>
+              <option value="premium">ハイオク</option>
+              <option value="diesel">軽油</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1">
+            <div class="lbl">スタンド名・メモ (任意)</div>
+            <input type="text" id="fStation" placeholder="例: ENEOS 盛岡インター店">
+          </div>
+        </div>
+        <div class="flex between center wrap" style="margin-top:14px;gap:10px">
+          <label class="flex center gap8" style="font-size:14px;font-weight:600;cursor:pointer">
+            <input type="checkbox" id="fFull" checked style="width:18px;height:18px">
+            満タン給油(燃費計算に使用)
+          </label>
+          <div class="flex center gap10">
+            <span id="formErr" class="text-red text-sm hidden"></span>
+            <button class="btn btn-primary" id="saveBtn" onclick="saveRecord()">記録する</button>
+          </div>
+        </div>
+      </div>
+      <!-- 履歴 -->
+      <div>
+        <div class="text-sub text-xs fw7" style="letter-spacing:.08em;margin:0 4px 8px">給油履歴</div>
+        <div id="recordList" class="flex col gap8"></div>
+      </div>
+    </div>
+
+    <!-- === 統計タブ === -->
+    <div id="tab-stats" class="hidden flex col gap16">
+      <div class="panel" id="statsSummary"></div>
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:12px">燃費の推移(満タン法)</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartKmpl"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:12px">月別走行距離</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chartDist"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:12px">月別給油費</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chartCost"></canvas></div>
+      </div>
+    </div>
+
+    <!-- === CSV出力タブ === -->
+    <div id="tab-export" class="hidden flex col gap16">
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:6px">月別集計CSV</div>
+        <p class="text-sub text-sm" style="margin-bottom:14px">
+          あなたの記録を車両×月ごとに集計します。月を指定するとその月だけ、空欄なら全期間を出力します。
+        </p>
+        <div class="flex center gap8" style="margin-bottom:12px">
+          <input type="month" id="exportMonth" style="width:auto">
+          <button class="btn btn-outline" onclick="downloadMonthlyCsv()">ダウンロード</button>
+        </div>
+        <div id="exportStatus" class="text-sm hidden"></div>
+      </div>
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:6px">給油明細CSV(全期間)</div>
+        <p class="text-sub text-sm" style="margin-bottom:14px">全ての給油記録を1行1件の明細形式で出力します。</p>
+        <button class="btn btn-outline" onclick="downloadDetailCsv()">ダウンロード</button>
+      </div>
+    </div>
+
+    <!-- === 車両管理タブ === -->
+    <div id="tab-vehicle" class="hidden flex col gap16">
+      <div class="panel flex between center wrap gap10">
+        <div>
+          <div class="fw7" style="font-size:14px">Googleスプレッドシートから読み込み</div>
+          <a href="https://docs.google.com/spreadsheets/d/1dJkWjJEJuVXXBbltVvQreDyFmnt69ZWD3QXIlV0M4c0/edit"
+             target="_blank" class="text-sub text-xs" style="text-decoration:none">車両マスタシートを開く ↗</a>
+        </div>
+        <div class="flex center gap8">
+          <span id="sheetSyncStatus" class="text-xs"></span>
+          <button class="btn btn-primary" style="font-size:13px;padding:7px 14px" onclick="loadVehicles()">再読み込み</button>
+        </div>
+      </div>
+      <div id="vehicleList" class="flex col gap8"></div>
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:10px;font-size:14px">車両を手動で追加</div>
+        <div class="grid2" style="margin-bottom:10px">
+          <input type="text" id="newVName" placeholder="車種名 例: VOXY">
+          <input type="text" id="newVNum"  placeholder="ナンバー 例: 盛岡300あ1234">
+        </div>
+        <div class="flex between center wrap gap8">
+          <label class="flex center gap8 text-sm fw7" style="cursor:pointer">
+            <input type="checkbox" id="saveToSheet" checked style="width:16px;height:16px">
+            スプレッドシートにも追記する
+          </label>
+          <div class="flex center gap10">
+            <span id="addVehicleStatus" class="text-sm hidden"></span>
+            <button class="btn btn-primary" style="font-size:13px" onclick="addVehicle()">追加</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="snack"></div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<script>
+// ============================================================
+// 設定 — GAS WebAppのURLをここに設定してください
+// ============================================================
+const GAS_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec";
+
+// ============================================================
+// ステート
+// ============================================================
+let token        = sessionStorage.getItem("token") || null;
+let currentUser  = sessionStorage.getItem("user")  || null;
+let isAdmin      = sessionStorage.getItem("admin") === "true";
+let vehicles     = [];
+let records      = [];
+let activeVehicleId = null;
+let editingRid   = null;
+let chartKmpl, chartDist, chartCost;
+
+const FUEL_COLORS = { regular: "#C8402E", premium: "#D9A400", diesel: "#1E7A4F" };
+const FUEL_LABELS = { regular: "レギュラー", premium: "ハイオク", diesel: "軽油" };
+
+// ============================================================
+// API呼び出し
+// ============================================================
+async function api(params) {
+  const url = GAS_URL + "?" + new URLSearchParams({ ...params, token: token || "" });
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("通信エラー: " + res.status);
+  // CSV出力はテキストで返す
+  if (params.action === "getMonthlyCsv") return res.text();
+  return res.json();
+}
+
+// ============================================================
+// ログイン・ログアウト
+// ============================================================
+async function doLogin() {
+  const name = document.getElementById("loginName").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  const btn  = document.getElementById("loginBtn");
+  const err  = document.getElementById("loginErr");
+  if (!name || !pass) { showErr(err, "氏名とパスワードを入力してください。"); return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  err.classList.add("hidden");
+  try {
+    const res = await api({ action: "login", name, pass });
+    if (!res.ok) { showErr(err, res.error); return; }
+    token = res.token; currentUser = res.name; isAdmin = res.isAdmin;
+    sessionStorage.setItem("token", token);
+    sessionStorage.setItem("user",  currentUser);
+    sessionStorage.setItem("admin", isAdmin);
+    document.getElementById("headerUser").textContent = currentUser + (isAdmin ? " (管理者)" : "");
+    document.getElementById("loginScreen").classList.add("hidden");
+    document.getElementById("appScreen").classList.remove("hidden");
+    await Promise.all([loadVehicles(), loadRecords()]);
+    renderAll();
+  } catch(e) {
+    showErr(err, e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "ログイン";
+  }
+}
+
+function doLogout() {
+  token = null; currentUser = null; isAdmin = false;
+  sessionStorage.clear();
+  records = []; vehicles = [];
+  document.getElementById("appScreen").classList.add("hidden");
+  document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("loginPass").value = "";
+}
+
+// Enterキーでログイン
+document.getElementById("loginPass").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+document.getElementById("loginName").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+
+// 既存セッションで自動復帰
+if (token && currentUser) {
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("appScreen").classList.remove("hidden");
+  document.getElementById("headerUser").textContent = currentUser + (isAdmin ? " (管理者)" : "");
+  Promise.all([loadVehicles(), loadRecords()]).then(() => renderAll());
+}
+
+// ============================================================
+// 車両
+// ============================================================
+async function loadVehicles() {
+  const st = document.getElementById("sheetSyncStatus");
+  if(st) { st.textContent = "🔄 同期中…"; st.className = "text-xs text-sub"; }
+  try {
+    const res = await api({ action: "getVehicles" });
+    if (!res.ok) throw new Error(res.error);
+    vehicles = res.vehicles;
+    if (!activeVehicleId && vehicles.length) activeVehicleId = vehicles[0].id;
+    renderVehicleSelect();
+    renderVehicleList();
+    if(st) { st.textContent = "✓ 同期済み"; st.className = "text-xs text-green fw7"; }
+  } catch(e) {
+    if(st) { st.textContent = "⚠ 読込失敗: " + e.message; st.className = "text-xs text-red"; }
+  }
+}
+
+function renderVehicleSelect() {
+  const sel = document.getElementById("vehicleSelect");
+  sel.innerHTML = vehicles.map(v =>
+    `<option value="${v.id}"${v.id===activeVehicleId?" selected":""}>${v.name}${v.number?" "+v.number:""}</option>`
+  ).join("");
+}
+
+function onVehicleChange() {
+  activeVehicleId = document.getElementById("vehicleSelect").value;
+  renderAll();
+}
+
+function renderVehicleList() {
+  const list = document.getElementById("vehicleList");
+  if (!list) return;
+  if (!vehicles.length) { list.innerHTML = '<div class="text-sub text-sm" style="text-align:center;padding:16px">車両がありません</div>'; return; }
+  list.innerHTML = vehicles.map(v => `
+    <div class="rec-card flex between center wrap gap8">
+      <div>
+        <strong>${esc(v.name)}</strong>
+        ${v.number ? `<span class="tag-mono">${esc(v.number)}</span>` : ""}
+        ${v.source==="manual"?'<span class="badge badge-yellow">手動</span>':""}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function addVehicle() {
+  const name   = document.getElementById("newVName").value.trim();
+  const number = document.getElementById("newVNum").value.trim();
+  const toSheet= document.getElementById("saveToSheet").checked;
+  const st     = document.getElementById("addVehicleStatus");
+  if (!name) { showSt(st, "車種名を入力してください。", "red"); return; }
+  showSt(st, "追加中…", "sub");
+  try {
+    if (toSheet) {
+      const res = await api({ action: "addVehicle", name, number });
+      if (!res.ok) throw new Error(res.error);
+    }
+    await loadVehicles();
+    document.getElementById("newVName").value = "";
+    document.getElementById("newVNum").value  = "";
+    showSt(st, "追加しました", "green");
+    snack("車両を追加しました");
+  } catch(e) {
+    showSt(st, "失敗: " + e.message, "red");
+  }
+}
+
+// ============================================================
+// 給油記録
+// ============================================================
+async function loadRecords() {
+  try {
+    const res = await api({ action: "getRecords" });
+    if (!res.ok) throw new Error(res.error);
+    records = res.records;
+  } catch(e) {
+    snack("記録の読み込みに失敗: " + e.message);
+  }
+}
+
+// 満タン法燃費計算(フロント側)
+function computeRecords(recs) {
+  const sorted = [...recs].sort((a,b) => a.date<b.date?-1:a.date>b.date?1:a.odo-b.odo);
+  let lastFullIdx = -1;
+  return sorted.map((r,i) => {
+    const prev = i>0 ? sorted[i-1] : null;
+    const tripDistance = prev ? r.odo - prev.odo : null;
+    let kmPerL = null;
+    if (r.full && lastFullIdx>=0) {
+      const base = sorted[lastFullIdx];
+      const dist = r.odo - base.odo;
+      let liters = 0;
+      for(let j=lastFullIdx+1;j<=i;j++) liters += sorted[j].liters;
+      if(dist>0 && liters>0) kmPerL = dist/liters;
+    }
+    if(r.full) lastFullIdx = i;
+    return {...r, tripDistance, kmPerL};
+  });
+}
+
+function vehicleRecords() {
+  return computeRecords(records.filter(r => r.vehicleId === activeVehicleId));
+}
+
+// ============================================================
+// フォーム
+// ============================================================
+function setFormDate() {
+  const d = new Date();
+  document.getElementById("fDate").value =
+    d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+setFormDate();
+
+// 単価×給油量で支払額を自動補完
+["fLiters","fPrice"].forEach(id => {
+  document.getElementById(id).addEventListener("input", () => {
+    const l = parseFloat(document.getElementById("fLiters").value);
+    const p = parseFloat(document.getElementById("fPrice").value);
+    const t = document.getElementById("fTotal");
+    if (l>0 && p>0 && !t.dataset.manual) t.placeholder = "自動: ¥"+Math.round(l*p).toLocaleString("ja-JP");
+  });
+});
+document.getElementById("fTotal").addEventListener("input", function() {
+  this.dataset.manual = this.value ? "1" : "";
+});
+
+async function saveRecord() {
+  const date     = document.getElementById("fDate").value;
+  const odo      = parseFloat(document.getElementById("fOdo").value);
+  const liters   = parseFloat(document.getElementById("fLiters").value);
+  const price    = document.getElementById("fPrice").value;
+  const totalEl  = document.getElementById("fTotal");
+  const total    = totalEl.value || (price && liters ? Math.round(liters*parseFloat(price)) : "");
+  const full     = document.getElementById("fFull").checked;
+  const fuelType = document.getElementById("fFuelType").value;
+  const station  = document.getElementById("fStation").value;
+  const errEl    = document.getElementById("formErr");
+
+  if (!date)            { showErr(errEl,"日付を入力してください。"); return; }
+  if (!odo || odo<=0)   { showErr(errEl,"走行距離計(ODO)を入力してください。"); return; }
+  if (!liters||liters<=0){ showErr(errEl,"給油量を入力してください。"); return; }
+  errEl.classList.add("hidden");
+
+  const vehicle = vehicles.find(v=>v.id===activeVehicleId) || {};
+  const params  = {
+    date, vehicleId: activeVehicleId, vehicleName: vehicle.name||"",
+    odo, liters, pricePerL: price||"", total: total||"",
+    full, fuelType, station,
+  };
+
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true;
+  try {
+    let res;
+    if (editingRid) {
+      res = await api({ action: "updateRecord", rid: editingRid, ...params });
+    } else {
+      res = await api({ action: "addRecord", ...params });
+    }
+    if (!res.ok) throw new Error(res.error);
+    snack(editingRid ? "記録を更新しました" : "記録しました");
+    cancelEdit();
+    await loadRecords();
+    renderAll();
+  } catch(e) {
+    showErr(errEl, e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function startEdit(rid) {
+  const r = records.find(r=>r.rid===rid);
+  if(!r) return;
+  editingRid = rid;
+  document.getElementById("fDate").value    = r.date;
+  document.getElementById("fOdo").value     = r.odo;
+  document.getElementById("fLiters").value  = r.liters;
+  document.getElementById("fPrice").value   = r.pricePerL||"";
+  document.getElementById("fTotal").value   = r.total||"";
+  document.getElementById("fFull").checked  = r.full;
+  document.getElementById("fFuelType").value= r.fuelType||"regular";
+  document.getElementById("fStation").value = r.station||"";
+  document.getElementById("formTitle").textContent = "記録を編集";
+  document.getElementById("saveBtn").textContent   = "更新する";
+  document.getElementById("cancelEditBtn").classList.remove("hidden");
+  document.getElementById("formPanel").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function cancelEdit() {
+  editingRid = null;
+  ["fDate","fOdo","fLiters","fPrice","fTotal","fStation"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("fFull").checked  = true;
+  document.getElementById("fFuelType").value= "regular";
+  document.getElementById("fTotal").dataset.manual = "";
+  document.getElementById("fTotal").placeholder = "自動計算";
+  document.getElementById("formTitle").textContent = "給油を記録";
+  document.getElementById("saveBtn").textContent   = "記録する";
+  document.getElementById("cancelEditBtn").classList.add("hidden");
+  document.getElementById("formErr").classList.add("hidden");
+  setFormDate();
+}
+
+async function deleteRecord(rid) {
+  if(!confirm("この記録を削除しますか?")) return;
+  try {
+    const res = await api({ action:"deleteRecord", rid });
+    if(!res.ok) throw new Error(res.error);
+    snack("削除しました");
+    await loadRecords();
+    renderAll();
+  } catch(e) { snack("削除失敗: "+e.message); }
+}
+
+// ============================================================
+// レンダリング
+// ============================================================
+function renderAll() {
+  renderSummary();
+  renderRecordList();
+  if (!document.getElementById("tab-stats").classList.contains("hidden")) renderCharts();
+}
+
+function renderSummary() {
+  const recs   = vehicleRecords();
+  const latest = recs[recs.length-1];
+  const full   = recs.filter(r=>r.kmPerL!=null);
+  const lastKmpl = full.length ? full[full.length-1].kmPerL : null;
+
+  document.getElementById("summary").innerHTML = `
+    ${odo("最新燃費", lastKmpl, 1, "km/L", 30)}
+    ${odo("総走行距離", latest?.odo, 0, "km", 22)}
+  `;
+}
+
+function odo(label, value, digits, unit, size) {
+  const text = (value==null||isNaN(value)) ? "—" : Number(value).toFixed(digits);
+  const chars = text.split("");
+  const px = size;
+  const digs = chars.map(ch => {
+    if(ch===".") return `<span class="odo-dot" style="font-size:${px}px">${ch}</span>`;
+    return `<span class="odo-digit" style="font-size:${px}px;min-width:${px*.68}px;padding:${px*.22}px ${px*.16}px">${ch}</span>`;
+  }).join("");
+  return `<div class="odo-wrap">
+    <div class="odo-label">${label}</div>
+    <div class="odo-row"><div class="odo-digits">${digs}</div><span class="odo-unit">${unit}</span></div>
+  </div>`;
+}
+
+function renderRecordList() {
+  const recs = [...vehicleRecords()].reverse();
+  const list = document.getElementById("recordList");
+  if (!recs.length) {
+    list.innerHTML = `<div class="panel text-sub text-sm" style="text-align:center;padding:20px;border-style:dashed">
+      まだ記録がありません。上のフォームから最初の給油を記録してください。
+    </div>`;
+    return;
+  }
+  list.innerHTML = recs.map(r => {
+    const color = FUEL_COLORS[r.fuelType]||"#888";
+    const kmplStr = r.kmPerL!=null ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--green)">${r.kmPerL.toFixed(1)} km/L</span>` : "";
+    return `
+    <div class="rec-card">
+      <div class="flex between center wrap gap8">
+        <div class="flex center gap8">
+          <span class="fuel-dot" style="background:${color}" title="${FUEL_LABELS[r.fuelType]||r.fuelType}"></span>
+          <strong>${r.date}</strong>
+          ${r.full?'<span class="badge badge-green">満タン</span>':""}
+        </div>
+        <div class="flex gap12">
+          <button class="btn text-sub text-sm" style="background:none;border:none" onclick="startEdit('${r.rid}')">編集</button>
+          <button class="btn text-red  text-sm" style="background:none;border:none" onclick="deleteRecord('${r.rid}')">削除</button>
+        </div>
+      </div>
+      <div class="rec-meta">
+        <span><span class="key">ODO</span>${fmt(r.odo)} km</span>
+        ${r.tripDistance!=null?`<span><span class="key">区間</span>${fmt(r.tripDistance)} km</span>`:""}
+        <span><span class="key">給油</span>${fmtD(r.liters,2)} L</span>
+        ${r.pricePerL!=null?`<span><span class="key">単価</span>¥${fmtD(r.pricePerL,1)}</span>`:""}
+        ${r.total!=null?`<span><span class="key">支払</span>¥${fmt(r.total)}</span>`:""}
+        ${kmplStr}
+      </div>
+      ${r.station?`<div class="text-sub text-xs" style="margin-top:6px">${esc(r.station)}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+// ============================================================
+// 統計グラフ
+// ============================================================
+function switchTab(tab) {
+  ["log","stats","export","vehicle"].forEach(t => {
+    document.getElementById("tab-"+t).classList.toggle("hidden", t!==tab);
+  });
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.tab===tab);
+  });
+  if(tab==="stats") renderCharts();
+}
+
+function renderCharts() {
+  const recs    = vehicleRecords();
+  const fullRecs= recs.filter(r=>r.kmPerL!=null).slice(-20);
+
+  // 燃費推移
+  destroyChart("chartKmpl");
+  if(fullRecs.length>=2) {
+    chartKmpl = new Chart(document.getElementById("chartKmpl"), {
+      type:"line",
+      data:{
+        labels: fullRecs.map(r=>r.date.slice(5).replace("-","/")),
+        datasets:[{
+          label:"燃費(km/L)", data: fullRecs.map(r=>+r.kmPerL.toFixed(2)),
+          borderColor:"#1E7A4F", backgroundColor:"rgba(30,122,79,.1)",
+          tension:.3, pointRadius:3, borderWidth:2.5
+        }]
+      },
+      options: chartOpts("km/L")
+    });
+  } else {
+    document.getElementById("chartKmpl").parentElement.innerHTML =
+      '<p class="text-sub text-sm">満タン給油の記録が2件以上たまるとグラフが表示されます。</p>';
+  }
+
+  // 月別集計
+  const monthly = buildMonthly(recs);
+  destroyChart("chartDist");
+  chartDist = new Chart(document.getElementById("chartDist"), {
+    type:"bar",
+    data:{
+      labels: monthly.map(m=>m.label),
+      datasets:[{ label:"走行距離(km)", data:monthly.map(m=>m.distance), backgroundColor:"#17242E", borderRadius:3 }]
+    },
+    options: chartOpts("km")
+  });
+
+  destroyChart("chartCost");
+  chartCost = new Chart(document.getElementById("chartCost"), {
+    type:"bar",
+    data:{
+      labels: monthly.map(m=>m.label),
+      datasets:[{ label:"給油費(円)", data:monthly.map(m=>m.cost), backgroundColor:"#C8402E", borderRadius:3 }]
+    },
+    options: chartOpts("円")
+  });
+
+  // サマリー
+  const totalLiters = recs.reduce((s,r)=>s+r.liters,0);
+  const totalCost   = recs.reduce((s,r)=>s+(r.total||0),0);
+  const first = recs[0], last = recs[recs.length-1];
+  const totalDist   = (first&&last) ? last.odo-first.odo : 0;
+  const avgKmpl     = fullRecs.length ? fullRecs.reduce((s,r)=>s+r.kmPerL,0)/fullRecs.length : null;
+  document.getElementById("statsSummary").innerHTML = `
+    <div class="text-sub text-xs" style="margin-bottom:12px">${currentUser} の記録(${recs.length}件)</div>
+    <div class="flex gap16 wrap" style="margin-bottom:12px">
+      ${odo("平均燃費",avgKmpl,1,"km/L",28)}
+      ${odo("総走行",totalDist,0,"km",20)}
+    </div>
+    <div class="flex gap16 wrap text-sm">
+      <span><span class="key">総給油量</span>${fmtD(totalLiters,1)} L</span>
+      <span><span class="key">総給油費</span>¥${fmt(totalCost)}</span>
+      ${totalDist&&totalCost?`<span><span class="key">燃料費/km</span>¥${fmtD(totalCost/totalDist,1)}</span>`:""}
+    </div>
+  `;
+}
+
+function buildMonthly(recs) {
+  const map={};
+  recs.forEach(r=>{
+    const mk = r.date?r.date.slice(0,7):"不明";
+    if(!map[mk]) map[mk]={month:mk,label:Number(mk.slice(5,7))+"月",distance:0,cost:0};
+    map[mk].distance += r.tripDistance||0;
+    map[mk].cost     += r.total||0;
+  });
+  return Object.values(map).sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
+}
+
+function chartOpts(unit) {
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false} },
+    scales:{
+      x:{ grid:{display:false}, ticks:{font:{size:11}} },
+      y:{ ticks:{font:{size:11}}, grid:{color:"#D8DEDA"} }
+    }
+  };
+}
+
+function destroyChart(id) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  const existing = Chart.getChart(el);
+  if(existing) existing.destroy();
+}
+
+// ============================================================
+// CSV出力
+// ============================================================
+async function downloadMonthlyCsv() {
+  const month  = document.getElementById("exportMonth").value;
+  const st     = document.getElementById("exportStatus");
+  showSt(st, "集計中…", "sub");
+  try {
+    const csv = await api({ action:"getMonthlyCsv", month: month||"" });
+    triggerDownload(csv, `給油記録_月別集計_${currentUser}_${month||"全期間"}.csv`);
+    showSt(st, "ダウンロードしました", "green");
+  } catch(e) {
+    showSt(st, "失敗: "+e.message, "red");
+  }
+}
+
+function downloadDetailCsv() {
+  const recs = computeRecords(records);
+  const header = ["給油日","車両名","ナンバー","走行距離計(km)","区間距離(km)","給油量(L)","単価(円/L)","支払額(円)","満タン","燃費(km/L)","油種","スタンド名"];
+  const rows = recs.map(r => {
+    const v = vehicles.find(vv=>vv.id===r.vehicleId)||{};
+    return [
+      r.date, r.vehicleName||v.name||"", v.number||"",
+      r.odo, r.tripDistance||"", r.liters,
+      r.pricePerL||"", r.total||"",
+      r.full?"○":"",
+      r.kmPerL!=null?r.kmPerL.toFixed(2):"",
+      FUEL_LABELS[r.fuelType]||r.fuelType, r.station||""
+    ];
+  });
+  const bom = "\uFEFF";
+  const csv = bom + [header,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  triggerDownload(csv, `給油記録_明細_${currentUser}_全期間.csv`);
+  snack("ダウンロードしました");
+}
+
+function triggerDownload(csv, filename) {
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// ユーティリティ
+// ============================================================
+const fmt  = n => (n==null||isNaN(n)) ? "—" : Number(n).toLocaleString("ja-JP",{maximumFractionDigits:0});
+const fmtD = (n,d)=> (n==null||isNaN(n)) ? "—" : Number(n).toLocaleString("ja-JP",{maximumFractionDigits:d,minimumFractionDigits:d});
+const esc  = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function showErr(el, msg) {
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+function showSt(el, msg, color) {
+  el.textContent = msg;
+  el.className = "text-sm " + (color==="green"?"text-green fw7":color==="red"?"text-red":"text-sub");
+  el.classList.remove("hidden");
+}
+
+let snackTimer;
+function snack(msg) {
+  const el = document.getElementById("snack");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(snackTimer);
+  snackTimer = setTimeout(() => el.classList.remove("show"), 2800);
+}
+</script>
+</body>
+</html>
