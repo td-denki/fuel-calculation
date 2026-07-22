@@ -54,8 +54,7 @@ main{max-width:800px;margin:0 auto;padding:16px 14px 72px;display:flex;flex-dire
 .rec-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13px}
 .rec-meta .key{color:var(--sub);font-size:11px;margin-right:3px}
 .etc-tag{background:#EEF0FB;color:var(--blue);border-radius:4px;padding:2px 7px;font-size:12px;font-weight:600}
-.etc-row{display:grid;grid-template-columns:1fr 120px 32px;gap:6px;align-items:center;margin-bottom:6px}
-@media(max-width:480px){.etc-row{grid-template-columns:1fr 90px 32px}}
+.etc-row{display:grid;grid-template-columns:1fr 32px;gap:6px;align-items:center;margin-bottom:6px}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:16px}
 .modal-box{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:380px}
 #snack{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:600;z-index:200;opacity:0;transition:opacity .25s;pointer-events:none}
@@ -168,8 +167,8 @@ main{max-width:800px;margin:0 auto;padding:16px 14px 72px;display:flex;flex-dire
         <div style="background:#F7F9F7;border-radius:8px;padding:12px;margin-bottom:10px">
           <div class="lbl" style="margin-bottom:8px">走行距離計(km)</div>
           <div class="grid3">
-            <div><div class="lbl">走行前</div><input type="number" id="fOdoStart" inputmode="decimal" placeholder="例: 45200" oninput="calcDistance()"></div>
-            <div><div class="lbl">走行後</div><input type="number" id="fOdoEnd" inputmode="decimal" placeholder="例: 45285" oninput="calcDistance()"></div>
+            <div><div class="lbl">走行前</div><input type="number" id="fOdoStart" inputmode="decimal" placeholder="例: 45200" oninput="calcDistance();saveDraft()"></div>
+            <div><div class="lbl">走行後</div><input type="number" id="fOdoEnd" inputmode="decimal" placeholder="例: 45285" oninput="calcDistance();saveDraft()"></div>
             <div><div class="lbl">走行距離(自動算出)</div><input type="text" id="fDistance" readonly style="background:#EDF0EB;font-weight:700;color:var(--green)" placeholder="—"></div>
           </div>
         </div>
@@ -179,10 +178,6 @@ main{max-width:800px;margin:0 auto;padding:16px 14px 72px;display:flex;flex-dire
             <button type="button" onclick="addEtcRow()" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px">＋ IC追加</button>
           </div>
           <div id="etcList"></div>
-          <div class="flex between center" style="margin-top:6px">
-            <span class="text-xs text-sub">ETC合計</span>
-            <span id="etcTotal" class="fw7" style="font-size:14px">¥0</span>
-          </div>
         </div>
         <div style="margin-bottom:10px">
           <label class="flex center gap8" style="cursor:pointer;font-size:14px;font-weight:600;margin-bottom:8px">
@@ -213,7 +208,7 @@ main{max-width:800px;margin:0 auto;padding:16px 14px 72px;display:flex;flex-dire
     <div id="tab-stats" class="hidden flex col gap16">
       <div class="panel" id="statsSummary"></div>
       <div class="panel"><div class="fw7" style="margin-bottom:12px">月別走行距離(km)</div><div style="position:relative;height:200px"><canvas id="chartDist"></canvas></div></div>
-      <div class="panel"><div class="fw7" style="margin-bottom:12px">月別ETC利用額(円)</div><div style="position:relative;height:180px"><canvas id="chartEtc"></canvas></div></div>
+      <div class="panel"><div class="fw7" style="margin-bottom:12px">月別ETC利用回数</div><div style="position:relative;height:180px"><canvas id="chartEtc"></canvas></div></div>
       <div class="panel"><div class="fw7" style="margin-bottom:12px">業務区分の内訳</div><div style="position:relative;height:220px"><canvas id="chartPurpose"></canvas></div></div>
     </div>
 
@@ -263,6 +258,14 @@ main{max-width:800px;margin:0 auto;padding:16px 14px 72px;display:flex;flex-dire
             <button class="btn btn-primary btn-sm" onclick="addVehicle()">追加</button>
           </div>
         </div>
+      </div>
+      <div class="panel">
+        <div class="fw7" style="margin-bottom:8px;font-size:14px">走行距離入力欄の設定</div>
+        <p class="text-sub text-sm" style="margin-bottom:10px">走行前・走行後に入力した値は、記録を保存しなくても次回ログイン時まで維持されます。</p>
+        <label class="flex center gap8 text-sm" style="cursor:pointer">
+          <input type="checkbox" id="clearBothSetting" style="width:16px;height:16px" onchange="setClearBothSetting(this.checked)">
+          走行前・走行後の両方に入力済みの場合は、次回ログイン時に値をクリアする
+        </label>
       </div>
     </div>
   </main>
@@ -341,6 +344,7 @@ async function doLogin() {
     document.getElementById("appScreen").classList.remove("hidden");
     await Promise.all([loadVehicles(),loadRecords()]);
     renderAll();
+    applyOdoDefaults();
   } catch(e) { showEl(err,e.message,"red"); }
   finally { btn.disabled=false; btn.textContent="ログイン"; }
 }
@@ -357,7 +361,7 @@ if (token&&currentUser) {
   document.getElementById("loginScreen").classList.add("hidden");
   document.getElementById("appScreen").classList.remove("hidden");
   document.getElementById("headerUser").textContent=currentUser+(isAdmin?" (管理者)":"");
-  Promise.all([loadVehicles(),loadRecords()]).then(()=>renderAll());
+  Promise.all([loadVehicles(),loadRecords()]).then(()=>{renderAll();applyOdoDefaults();});
 }
 
 // ===== 車両 =====
@@ -381,17 +385,59 @@ function renderVehicleSelect() {
 }
 function onVehicleChange() {
   activeVehicleId=document.getElementById("vehicleSelect").value;
-  // VOXY・エクストレイル・Bb: 直近の走行後距離を走行前に自動入力
-  const AUTO_FILL = ["VOXY","エクストレイル","Bb"];
-  const veh=vehicles.find(v=>v.id===activeVehicleId);
-  if (veh && AUTO_FILL.some(n=>veh.name.includes(n))) {
-    const vRecs=records.filter(r=>r.vehicleId===activeVehicleId).sort((a,b)=>a.date<b.date?-1:1);
-    if (vRecs.length) {
-      document.getElementById("fOdoStart").value=vRecs[vRecs.length-1].odoEnd||"";
-      calcDistance();
-    }
-  }
+  applyOdoDefaults();
   renderAll();
+}
+
+// ===== 走行距離の下書き保存(次回ログイン時も維持) =====
+const DRAFT_PREFIX = "driveDraft_";
+const SETTING_PREFIX = "driveClearBoth_";
+function draftKey() { return DRAFT_PREFIX+currentUser+"_"+activeVehicleId; }
+function settingKey() { return SETTING_PREFIX+currentUser; }
+function getClearBothSetting() {
+  const v = localStorage.getItem(settingKey());
+  return v===null ? true : v==="true"; // 既定値: ON(両方入力済みならクリア)
+}
+function setClearBothSetting(val) {
+  localStorage.setItem(settingKey(), val ? "true" : "false");
+}
+function saveDraft() {
+  if (editingRid) return; // 編集中は下書きを更新しない
+  if (!currentUser || !activeVehicleId) return;
+  const s=document.getElementById("fOdoStart").value;
+  const e=document.getElementById("fOdoEnd").value;
+  if (!s && !e) { localStorage.removeItem(draftKey()); return; }
+  localStorage.setItem(draftKey(), JSON.stringify({odoStart:s, odoEnd:e}));
+}
+function applyOdoDefaults() {
+  if (!currentUser || !activeVehicleId) return;
+  const key = draftKey();
+  let draft = null;
+  const raw = localStorage.getItem(key);
+  if (raw) { try { draft = JSON.parse(raw); } catch(e) {} }
+
+  // 走行前・走行後どちらも入力済みの下書きは、設定がONなら次回ログイン時にクリア
+  if (draft && draft.odoStart && draft.odoEnd && getClearBothSetting()) {
+    localStorage.removeItem(key);
+    draft = null;
+  }
+
+  if (draft && (draft.odoStart || draft.odoEnd)) {
+    document.getElementById("fOdoStart").value = draft.odoStart || "";
+    document.getElementById("fOdoEnd").value   = draft.odoEnd   || "";
+  } else {
+    // 下書きが無い場合: VOXY・エクストレイル・Bbは直近の走行後距離を走行前に自動入力
+    const AUTO_FILL = ["VOXY","エクストレイル","Bb"];
+    const veh = vehicles.find(v=>v.id===activeVehicleId);
+    if (veh && AUTO_FILL.some(n=>veh.name.includes(n))) {
+      const vRecs = records.filter(r=>r.vehicleId===activeVehicleId).sort((a,b)=>a.date<b.date?-1:1);
+      document.getElementById("fOdoStart").value = vRecs.length ? (vRecs[vRecs.length-1].odoEnd||"") : "";
+    } else {
+      document.getElementById("fOdoStart").value = "";
+    }
+    document.getElementById("fOdoEnd").value = "";
+  }
+  calcDistance();
 }
 function renderVehicleList() {
   const list=document.getElementById("vehicleList");
@@ -446,32 +492,23 @@ function calcDistance() {
 }
 
 // ETC
-function addEtcRow(ic="",amount="") {
+function addEtcRow(ic="") {
   const id="etc_"+(etcId++);
   const div=document.createElement("div");
   div.className="etc-row"; div.id=id;
   div.innerHTML=`
     <input type="text" placeholder="例: 盛岡IC→花巻IC" value="${esc(String(ic))}" class="etc-ic">
-    <input type="number" placeholder="金額(円)" value="${amount}" class="etc-amt" inputmode="numeric" oninput="updateEtcTotal()">
     <button type="button" onclick="removeEtcRow('${id}')" style="background:#FEE;border:1px solid #FCC;border-radius:6px;color:var(--red);font-size:16px;width:32px;height:36px">×</button>`;
   document.getElementById("etcList").appendChild(div);
-  updateEtcTotal();
 }
 function removeEtcRow(id) {
   const el=document.getElementById(id);
   if(el)el.remove();
-  updateEtcTotal();
-}
-function updateEtcTotal() {
-  const total=[...document.querySelectorAll(".etc-amt")].reduce((s,el)=>s+(parseFloat(el.value)||0),0);
-  document.getElementById("etcTotal").textContent="¥"+total.toLocaleString("ja-JP");
 }
 function getEtcData() {
-  return [...document.getElementById("etcList").children].map(row=>{
-    const ic=row.querySelector(".etc-ic").value.trim();
-    const amount=parseFloat(row.querySelector(".etc-amt").value)||0;
-    return {ic,amount};
-  }).filter(e=>e.ic||e.amount>0);
+  return [...document.getElementById("etcList").children]
+    .map(row=>row.querySelector(".etc-ic").value.trim())
+    .filter(ic=>ic);
 }
 
 async function saveRecord() {
@@ -517,6 +554,7 @@ async function saveRecord() {
     await loadRecords(); renderAll();
     document.getElementById("fOdoStart").value=odoEnd;
     calcDistance();
+    saveDraft();
   } catch(e) {showEl(errEl,e.message,"red");}
   finally {btn.disabled=false;}
 }
@@ -537,7 +575,7 @@ function startEdit(rid) {
   document.getElementById("fOdoEnd").value=r.odoEnd;
   calcDistance();
   document.getElementById("etcList").innerHTML="";
-  (r.etc||[]).forEach(e=>addEtcRow(e.ic,e.amount));
+  (r.etc||[]).forEach(e=>addEtcRow(typeof e==="string"?e:e.ic));
   const fueled=r.fuelLiters!=null;
   document.getElementById("fFueled").checked=fueled; onFuelChange();
   if(fueled) document.getElementById("fFuelLiters").value=r.fuelLiters;
@@ -553,12 +591,12 @@ function cancelEdit() {
   document.getElementById("fPurposeSelect").value="";
   document.getElementById("fFueled").checked=false; onFuelChange();
   document.getElementById("purposeCustomWrap").classList.add("hidden");
-  document.getElementById("etcList").innerHTML=""; updateEtcTotal();
+  document.getElementById("etcList").innerHTML="";
   document.getElementById("formTitle").textContent="業務用車の使用を記録";
   document.getElementById("saveBtn").textContent="記録する";
   document.getElementById("cancelEditBtn").classList.add("hidden");
   document.getElementById("formErr").classList.add("hidden");
-  setToday(); calcDistance();
+  setToday(); applyOdoDefaults();
 }
 async function deleteRecord(rid) {
   if(!confirm("この記録を削除しますか?")) return;
@@ -577,12 +615,12 @@ function renderAll() {
 function renderSummary() {
   const recs=records.filter(r=>r.vehicleId===activeVehicleId);
   const totalDist=recs.reduce((s,r)=>s+(r.distance||0),0);
-  const totalEtc=recs.reduce((s,r)=>s+(r.etc||[]).reduce((ss,e)=>ss+(Number(e.amount)||0),0),0);
+  const totalEtcCount=recs.reduce((s,r)=>s+(r.etc||[]).length,0);
   const totalFuel=recs.filter(r=>r.fuelLiters!=null).reduce((s,r)=>s+r.fuelLiters,0);
   document.getElementById("summary").innerHTML=
     odo("累計走行距離",totalDist,0,"km",28)+
     `<div class="odo-wrap"><div class="odo-label">給油量合計</div><div class="odo-row"><span style="font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:#F3F5F2;background:linear-gradient(180deg,#2A3540 0%,#101820 70%);border-radius:6px;padding:6px 10px">${totalFuel>0?totalFuel.toFixed(1):"—"}</span><span class="odo-unit">L</span></div></div>`+
-    `<div class="odo-wrap"><div class="odo-label">ETC合計</div><div class="odo-row"><span style="font-size:22px;font-weight:700">¥${fmt(totalEtc)}</span></div></div>`;
+    `<div class="odo-wrap"><div class="odo-label">ETC利用回数</div><div class="odo-row"><span style="font-size:22px;font-weight:700">${totalEtcCount}</span><span class="odo-unit">回</span></div></div>`;
 }
 function odo(label,value,digits,unit,size) {
   const text=(value==null||isNaN(value))?"—":Number(value).toFixed(digits);
@@ -595,8 +633,7 @@ function renderRecordList() {
   const list=document.getElementById("recordList");
   if(!recs.length){list.innerHTML=`<div class="panel text-sub text-sm" style="text-align:center;padding:20px;border-style:dashed">まだ記録がありません。上のフォームから最初の記録を追加してください。</div>`;return;}
   list.innerHTML=recs.map(r=>{
-    const etcTotal=(r.etc||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
-    const etcTags=(r.etc||[]).filter(e=>e.ic).map(e=>`<span class="etc-tag">${esc(e.ic)}</span>`).join(" ");
+    const etcTags=(r.etc||[]).map(e=>typeof e==="string"?e:e.ic).filter(Boolean).map(ic=>`<span class="etc-tag">${esc(ic)}</span>`).join(" ");
     return `<div class="rec-card">
       <div class="flex between center wrap gap8">
         <div class="flex center gap8 wrap">
@@ -613,7 +650,6 @@ function renderRecordList() {
         <span><span class="key">目的地/訪問先</span>${esc(r.destination||"—")}</span>
         <span><span class="key">走行距離</span><strong>${fmt(r.distance)} km</strong></span>
         <span><span class="key">ODO</span>${fmt(r.odoStart)}→${fmt(r.odoEnd)}</span>
-        ${etcTotal?`<span><span class="key">ETC</span>¥${fmt(etcTotal)}</span>`:""}
       </div>
       ${etcTags?`<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${etcTags}</div>`:""}
       ${r.memo?`<div class="text-sub text-xs" style="margin-top:6px">${esc(r.memo)}</div>`:""}
@@ -626,6 +662,7 @@ function switchTab(tab) {
   ["log","stats","export","vehicle"].forEach(t=>document.getElementById("tab-"+t).classList.toggle("hidden",t!==tab));
   document.querySelectorAll(".tab-btn").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
   if(tab==="stats") renderCharts();
+  if(tab==="vehicle") document.getElementById("clearBothSetting").checked = getClearBothSetting();
 }
 function renderCharts() {
   const recs=records.filter(r=>r.vehicleId===activeVehicleId);
@@ -633,7 +670,7 @@ function renderCharts() {
   destroyChart("chartDist");
   new Chart(document.getElementById("chartDist"),{type:"bar",data:{labels:monthly.map(m=>m.label),datasets:[{label:"km",data:monthly.map(m=>m.distance),backgroundColor:"#17242E",borderRadius:3}]},options:chartOpts()});
   destroyChart("chartEtc");
-  new Chart(document.getElementById("chartEtc"),{type:"bar",data:{labels:monthly.map(m=>m.label),datasets:[{label:"円",data:monthly.map(m=>m.etcTotal),backgroundColor:"#2E3578",borderRadius:3}]},options:chartOpts()});
+  new Chart(document.getElementById("chartEtc"),{type:"bar",data:{labels:monthly.map(m=>m.label),datasets:[{label:"回",data:monthly.map(m=>m.etcCount),backgroundColor:"#2E3578",borderRadius:3}]},options:chartOpts()});
   const pm={};
   recs.forEach(r=>{const k=r.purpose||"未分類";pm[k]=(pm[k]||0)+1;});
   const pl=Object.keys(pm),pd=Object.values(pm);
@@ -641,23 +678,23 @@ function renderCharts() {
   destroyChart("chartPurpose");
   new Chart(document.getElementById("chartPurpose"),{type:"doughnut",data:{labels:pl,datasets:[{data:pd,backgroundColor:colors.slice(0,pl.length),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{font:{size:12}}}}}});
   const totalDist=recs.reduce((s,r)=>s+(r.distance||0),0);
-  const totalEtc=recs.reduce((s,r)=>s+(r.etc||[]).reduce((ss,e)=>ss+(Number(e.amount)||0),0),0);
+  const totalEtcCount=recs.reduce((s,r)=>s+(r.etc||[]).length,0);
   const totalFuel=recs.filter(r=>r.fuelLiters!=null).reduce((s,r)=>s+r.fuelLiters,0);
   document.getElementById("statsSummary").innerHTML=`
     <div class="text-sub text-xs" style="margin-bottom:10px">${currentUser} の記録(${recs.length}件)</div>
     <div class="flex gap16 wrap">
       ${odo("累計走行",totalDist,0,"km",24)}
       <div class="odo-wrap"><div class="odo-label">給油合計</div><div class="odo-row"><span style="font-size:18px;font-weight:700">${totalFuel.toFixed(1)} L</span></div></div>
-      <div class="odo-wrap"><div class="odo-label">ETC合計</div><div class="odo-row"><span style="font-size:18px;font-weight:700">¥${fmt(totalEtc)}</span></div></div>
+      <div class="odo-wrap"><div class="odo-label">ETC利用回数</div><div class="odo-row"><span style="font-size:18px;font-weight:700">${totalEtcCount} 回</span></div></div>
     </div>`;
 }
 function buildMonthly(recs) {
   const map={};
   recs.forEach(r=>{
     const mk=(r.date||"").slice(0,7);
-    if(!map[mk])map[mk]={month:mk,label:Number(mk.slice(5,7))+"月",distance:0,etcTotal:0};
+    if(!map[mk])map[mk]={month:mk,label:Number(mk.slice(5,7))+"月",distance:0,etcCount:0};
     map[mk].distance+=r.distance||0;
-    map[mk].etcTotal+=(r.etc||[]).reduce((s,e)=>s+(Number(e.amount)||0),0);
+    map[mk].etcCount+=(r.etc||[]).length;
   });
   return Object.values(map).sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
 }
@@ -683,14 +720,13 @@ async function downloadMonthlyCsv() {
   } catch(e) {showEl(st,"失敗: "+e.message,"red");}
 }
 function downloadDetailCsv() {
-  const header=["使用日","車両","目的地","訪問先","業務区分","走行前(km)","走行後(km)","走行距離(km)","給油量(L)","ETC件数","ETC合計(円)","ETC詳細","メモ"];
+  const header=["使用日","車両","目的地","訪問先","業務区分","走行前(km)","走行後(km)","走行距離(km)","給油量(L)","ETC件数","ETC詳細","メモ"];
   const rows=records.map(r=>{
     const parts=(r.destination||"").split(" / ");
     return [r.date,r.vehicleName,parts[0]||"",parts[1]||"",r.purpose,r.odoStart,r.odoEnd,r.distance,
       r.fuelLiters!=null?r.fuelLiters:"",
       (r.etc||[]).length,
-      (r.etc||[]).reduce((s,e)=>s+(Number(e.amount)||0),0)||"",
-      (r.etc||[]).map(e=>e.ic+(e.amount?":¥"+e.amount:"")).join(" / "),
+      (r.etc||[]).map(e=>typeof e==="string"?e:e.ic).filter(Boolean).join(" / "),
       r.memo||""];
   });
   const bom="﻿";
