@@ -80,8 +80,29 @@ main{max-width:800px;margin:0 auto;padding:16px 14px 72px;display:flex;flex-dire
     </div>
     <div id="loginErr" class="text-red text-sm hidden" style="margin-bottom:10px"></div>
     <button class="btn btn-primary" style="width:100%" id="loginBtn" onclick="doLogin()">ログイン</button>
-    <div style="text-align:center;margin-top:14px">
+    <div style="text-align:center;margin-top:14px" class="flex center gap12" style="justify-content:center">
       <button onclick="showResetModal()" style="background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;text-decoration:underline">パスワードを忘れた方</button>
+      <span class="text-sub text-xs">|</span>
+      <button onclick="showPreChangePwModal()" style="background:none;border:none;color:var(--sub);font-size:13px;cursor:pointer;text-decoration:underline">パスワードを変更する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ログイン前パスワード変更モーダル -->
+<div class="modal-bg" id="preChangePwModal">
+  <div class="modal-box">
+    <h3 style="margin:0 0 8px;font-size:16px">パスワード変更</h3>
+    <p class="text-sub text-sm" style="margin-bottom:14px">氏名と現在のパスワードを確認のうえ、新しいパスワードに変更します。</p>
+    <div class="flex col gap8" style="margin-bottom:12px">
+      <div><div class="lbl">氏名</div><input type="text" id="pcpName" placeholder="例: 佐藤英匡" autocomplete="username"></div>
+      <div><div class="lbl">現在のパスワード</div><input type="password" id="pcpOld" autocomplete="current-password"></div>
+      <div><div class="lbl">新しいパスワード(6文字以上)</div><input type="password" id="pcpNew" autocomplete="new-password"></div>
+      <div><div class="lbl">新しいパスワード(確認)</div><input type="password" id="pcpNew2" autocomplete="new-password"></div>
+    </div>
+    <div id="pcpMsg" class="text-sm hidden" style="margin-bottom:10px"></div>
+    <div class="flex gap8">
+      <button class="btn btn-outline" style="flex:1" onclick="hideModal('preChangePwModal')">キャンセル</button>
+      <button class="btn btn-primary" style="flex:1" id="pcpBtn" onclick="doPreChangePassword()">変更する</button>
     </div>
   </div>
 </div>
@@ -673,8 +694,7 @@ function downloadDetailCsv() {
       r.memo||""];
   });
   const bom="﻿";
-  const csv=bom+[header,...rows].map(r=>r.map(c=>`"${String(c??"").replace(/"/g,'""')}"`).join(",")).join("
-");
+  const csv=bom+[header,...rows].map(r=>r.map(c=>`"${String(c??"").replace(/"/g,'""')}"`).join(",")).join("\r\n");
   triggerDownload(csv,`業務用車使用記録_明細_${currentUser}_全期間.csv`);
   snack("ダウンロードしました");
 }
@@ -704,6 +724,40 @@ async function doReset() {
     if(data.ok){showEl(msg,`仮パスワードを ${data.email} に送信しました。`,"green");btn.textContent="送信済み";}
     else{showEl(msg,data.error||"失敗しました。","red");btn.disabled=false;btn.textContent="送信";}
   }catch(e){showEl(msg,"通信エラー: "+e.message,"red");btn.disabled=false;btn.textContent="送信";}
+}
+function showPreChangePwModal() {
+  showModal("preChangePwModal");
+  ["pcpName","pcpOld","pcpNew","pcpNew2"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("pcpMsg").classList.add("hidden");
+  document.getElementById("pcpBtn").disabled=false;
+  document.getElementById("pcpBtn").textContent="変更する";
+}
+async function doPreChangePassword() {
+  const name=document.getElementById("pcpName").value.trim();
+  const oldPass=document.getElementById("pcpOld").value;
+  const newPass=document.getElementById("pcpNew").value;
+  const newPass2=document.getElementById("pcpNew2").value;
+  const msg=document.getElementById("pcpMsg");
+  const btn=document.getElementById("pcpBtn");
+  if(!name||!oldPass||!newPass||!newPass2){showEl(msg,"すべて入力してください。","red");return;}
+  if(newPass!==newPass2){showEl(msg,"新しいパスワードが一致しません。","red");return;}
+  if(newPass.length<6){showEl(msg,"新しいパスワードは6文字以上にしてください。","red");return;}
+  btn.disabled=true; btn.textContent="変更中…";
+  try {
+    const res=await fetch(GAS_URL+"?"+new URLSearchParams({action:"changePasswordPre",name,oldPass,newPass}));
+    const data=await res.json();
+    if(data.ok){
+      showEl(msg,"パスワードを変更しました。","green");
+      btn.textContent="変更済み";
+      setTimeout(()=>hideModal("preChangePwModal"),1200);
+    } else {
+      showEl(msg,data.error||"失敗しました。","red");
+      btn.disabled=false; btn.textContent="変更する";
+    }
+  } catch(e) {
+    showEl(msg,"通信エラー: "+e.message,"red");
+    btn.disabled=false; btn.textContent="変更する";
+  }
 }
 function showChangePwModal() {
   showModal("changePwModal");
