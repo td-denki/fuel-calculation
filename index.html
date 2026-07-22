@@ -378,24 +378,45 @@ document.querySelectorAll(".modalOverlay").forEach(function(el){
 });
 
 function gasGet(params){
+  var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(String(params[k]));}).join("&");
+  // まず fetch を試み、失敗したら JSONP にフォールバック
+  return fetch(GAS_URL+"?"+qs,{method:"GET",redirect:"follow"})
+    .then(function(r){
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      return r.json();
+    })
+    .catch(function(){
+      return gasGetJsonp(params);
+    });
+}
+
+function gasGetJsonp(params){
   return new Promise(function(resolve,reject){
-    var cbName="cb_"+Date.now()+"_"+Math.random().toString(36).slice(2);
-    params.callback=cbName;
-    var qs=Object.keys(params).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(String(params[k]));}).join("&");
+    var cbName="cb_"+Date.now()+"_"+Math.floor(Math.random()*1000000);
+    var p={};
+    for(var k in params){if(params.hasOwnProperty(k))p[k]=params[k];}
+    p.callback=cbName;
+    var qs=Object.keys(p).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(String(p[k]));}).join("&");
     var script=document.createElement("script");
+    var done=false;
     var timer=setTimeout(function(){
-      delete window[cbName];
+      if(done)return;done=true;
+      try{delete window[cbName];}catch(e){window[cbName]=undefined;}
       if(script.parentNode)script.parentNode.removeChild(script);
       reject(new Error("通信タイムアウト"));
-    },15000);
+    },20000);
     window[cbName]=function(data){
-      clearTimeout(timer);delete window[cbName];
+      if(done)return;done=true;
+      clearTimeout(timer);
+      try{delete window[cbName];}catch(e){window[cbName]=undefined;}
       if(script.parentNode)script.parentNode.removeChild(script);
       resolve(data);
     };
     script.src=GAS_URL+"?"+qs;
     script.onerror=function(){
-      clearTimeout(timer);delete window[cbName];
+      if(done)return;done=true;
+      clearTimeout(timer);
+      try{delete window[cbName];}catch(e){window[cbName]=undefined;}
       if(script.parentNode)script.parentNode.removeChild(script);
       reject(new Error("スクリプト読み込みエラー"));
     };
